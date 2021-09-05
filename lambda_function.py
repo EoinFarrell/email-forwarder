@@ -18,9 +18,26 @@ from botocore.exceptions import ClientError
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
-import mailparser
 
 region = os.environ['Region']
+
+def get_body(b):
+    body = ""
+    
+    if b.is_multipart():
+        for part in b.walk():
+            ctype = part.get_content_type()
+            cdispo = str(part.get('Content-Disposition'))
+    
+            # skip any text/plain (txt) attachments
+            if ctype == 'text/plain' and 'attachment' not in cdispo:
+                body = part.get_payload(decode=True)  # decode
+                break
+    # not multipart - i.e. plain text, no attachments, keeping fingers crossed
+    else:
+        body = b.get_payload(decode=True)
+        
+    return b
 
 def get_message_from_s3(message_id):
 
@@ -66,9 +83,7 @@ def create_message(file_dict):
     subject_original = mailobject['Subject']
     subject = "FW: " + subject_original
     #body_original = mailobject['Body']
-    
-    mail = mailparser.parse_from_file(file_dict['file'])
-    body_original =  mail.body
+    body_original =  str(get_body(mailobject))
     
     from_original = from_original.replace("@", "-")
     from_original = from_original.replace(".", "-")
@@ -76,7 +91,7 @@ def create_message(file_dict):
     from_original = from_original.replace(">", "")
 
     # The body text of the email.
-    body_text = ("v8 <br>" 
+    body_text = ("v9 <br>" 
                 + "From:    " + from_original + "<br>"
                 + "To:      " + to_original + "<br>"
                 + "Subject: " + subject_original + "<br>"
